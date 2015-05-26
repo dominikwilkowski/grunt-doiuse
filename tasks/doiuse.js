@@ -11,8 +11,9 @@
 //--------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Dependencies
 //--------------------------------------------------------------------------------------------------------------------------------------------------------------
-var fs = require('fs');
-var doiuse = require('doiuse/stream');
+var Fs = require('fs');
+var Promise = require('promise');
+var Doiuse = require('doiuse/stream');
 
 
 //--------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -23,10 +24,12 @@ var doiuse = require('doiuse/stream');
 //--------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Grunt plugin
 //--------------------------------------------------------------------------------------------------------------------------------------------------------------
-module.exports = function(grunt) {
+module.exports = function GruntTask(grunt) {
 
-	grunt.registerMultiTask('doiuse', 'Check your css against the CanIUse database', function() {
+	grunt.registerMultiTask('doiuse', 'Check your css against the CanIUse database', function GruntMultiTask() {
 
+		var done = this.async();
+		var allFiles = [];
 
 		//default options
 		var OPTIONS = this.options({
@@ -34,50 +37,58 @@ module.exports = function(grunt) {
 		});
 
 
-		this.files.forEach(function( files ) {
+		this.files.forEach(function TargetLoop( files ) {
 
+			//run DoIUse
+			var promises = files.src.map(function ListPromises(file) {
 
-			//iterate over all files
-			files.src.forEach(function(sourceFile) {
+				allFiles.push( file );
 
-				var stats = fs.lstatSync( sourceFile );
+				return new Promise(function NewPromise(resolve, reject) {
 
-				if( !stats.isFile() ) {
-					grunt.log.warn( 'Source file "' + sourceFile + '" not found.' );
-					return false;
-				}
+					var stats = Fs.lstatSync( file );
+					var usageInfos = [];
 
-
-				try {
-
-					grunt.log.oklns( 'Checking "' + sourceFile + '"' );
-
-
-					//run DoIUse
-					fs
-						.createReadStream( sourceFile )
-						.pipe( doiuse( OPTIONS.browsers ) )
-						.on('data', function( usageInfo ) {
-							grunt.log.oklns("message");
-							console.log(usageInfo);
-							console.log(usageInfo.message);
-							done();
-						});
-
-				}
-				catch( e ) {
-					var err = new Error( 'DoIUse failed.' );
-
-					if( e.msg ) {
-						err.message += ', ' + e.msg + '.';
+					if( !stats.isFile() ) {
+						grunt.log.warn( 'Source file "' + file + '" not found.' );
+						return false;
 					}
 
-					err.origError = e;
-					grunt.log.warn( 'Scanning source file "' + sourceFile + '" failed.' );
-					grunt.fail.warn( err );
-				}
+					Fs
+						.createReadStream( file )
+						.pipe( new Doiuse( OPTIONS.browsers ) )
+						.on('data', function GetData(info) { usageInfos.push(info); })
+						.on('end', function End() { resolve(usageInfos); })
+						.on('error', reject);
 
+				});
 			});
+
+
+			Promise
+				.all(promises)
+				.then(function(usageInfos) {
+
+					var i = 0;
+
+					allFiles.forEach(function MessageLoop( file ) {
+
+						console.log(file); //headline
+
+						usageInfos[i].forEach(function UsageLoop( usage ) {
+							console.log( usage.message.replace( '<streaming css input>', '') );
+						});
+
+						i++;
+					});
+
+					done(true);
+				}, function(err) {
+					console.error("(At least) one of them failed", err);
+
+					done(true);
+				});
+
 		});
 
 

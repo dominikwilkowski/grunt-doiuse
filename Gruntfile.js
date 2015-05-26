@@ -29,8 +29,6 @@ module.exports = function( grunt ) {
 		// Configuration to be run (and then tested).
 		doiuse: {
 			default_options: {
-				options: {
-				},
 				files: [{
 					src: [
 						'./test/fixtures/backgrounds.css',
@@ -44,8 +42,8 @@ module.exports = function( grunt ) {
 				},
 				files: [{
 					src: [
-						'./test/fixtures/backgrounds.css',
 						'./test/fixtures/counters.css',
+						'./test/fixtures/backgrounds.css',
 					],
 				}],
 			},
